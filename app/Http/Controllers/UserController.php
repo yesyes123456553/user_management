@@ -32,7 +32,7 @@ class UserController extends Controller
             abort(403, 'Only Super Admin can manage Super Admin accounts.');
         }
 
-        // Prevent deleting or changing your own role through this CRUD.
+        // Prevent modifying your own account through User Management.
         if ($user->id === $currentUser->id) {
             abort(403, 'You cannot modify your own account through User Management.');
         }
@@ -55,10 +55,16 @@ class UserController extends Controller
         }
     }
 
-    // READ
-    public function index(): View
+    // READ USERS / VIEW DELETED USERS
+    public function index(Request $request): View
     {
+        $showDeleted = $request->boolean('deleted');
+
         $query = User::with('role')->latest();
+
+        if ($showDeleted) {
+            $query->onlyDeleted();
+        }
 
         // Admin cannot view Super Admin accounts.
         if (Auth::user()->hasRole('admin')) {
@@ -68,7 +74,8 @@ class UserController extends Controller
         }
 
         return view('Users.index', [
-            'users' => $query->paginate(10),
+            'users' => $query->paginate(10)->withQueryString(),
+            'showDeleted' => $showDeleted,
         ]);
     }
 
@@ -77,7 +84,6 @@ class UserController extends Controller
     {
         $roles = Role::orderBy('label');
 
-        // Admin cannot assign Super Admin.
         if (Auth::user()->hasRole('admin')) {
             $roles->where('name', '!=', 'super_admin');
         }
@@ -168,5 +174,21 @@ class UserController extends Controller
         return redirect()
             ->route('users.index')
             ->with('success', 'User deleted successfully.');
+    }
+
+    // RESTORE DELETED USER
+    public function restore(int $id): RedirectResponse
+    {
+        $user = User::onlyDeleted()
+            ->with('role')
+            ->findOrFail($id);
+
+        $this->authorizeTarget($user);
+
+        $user->restoreDeleted();
+
+        return redirect()
+            ->route('users.index', ['deleted' => 1])
+            ->with('success', 'User restored successfully.');
     }
 }

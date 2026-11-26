@@ -116,4 +116,63 @@ class UserManagementTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_admin_can_view_and_restore_a_deleted_user(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $target = $this->makeUserWithRole('user');
+        $roleId = $target->role_id;
+        $target->delete();
+
+        $this->actingAs($admin)
+            ->get(route('users.index', ['deleted' => 1]))
+            ->assertOk()
+            ->assertSee($target->email)
+            ->assertSee('Restore');
+
+        $this->patch(route('users.restore', $target->id))
+            ->assertRedirect(route('users.index', ['deleted' => 1]));
+
+        $this->assertDatabaseHas('users', [
+            'id' => $target->id,
+            'is_deleted' => 0,
+            'role_id' => $roleId,
+            'email' => $target->email,
+        ]);
+
+        $this->get(route('users.index'))
+            ->assertOk()
+            ->assertSee($target->email);
+    }
+
+    public function test_super_user_cannot_restore_a_deleted_user(): void
+    {
+        $target = $this->makeUserWithRole('user');
+        $target->delete();
+
+        $this->actingAs($this->makeUserWithRole('super_user'))
+            ->patch(route('users.restore', $target->id))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $target->id,
+            'is_deleted' => 1,
+        ]);
+    }
+
+    public function test_admin_cannot_restore_a_super_admin_account(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $target = $this->makeUserWithRole('super_admin');
+        $target->delete();
+
+        $this->actingAs($admin)
+            ->patch(route('users.restore', $target->id))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $target->id,
+            'is_deleted' => 1,
+        ]);
+    }
 }

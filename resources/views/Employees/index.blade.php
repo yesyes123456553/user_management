@@ -12,18 +12,35 @@
 
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span><i class="fas fa-id-badge me-1"></i> All Employees</span>
+            <span>
+                <i class="fas fa-id-badge me-1"></i>
+                {{ $showDeleted ? 'Deleted Employees' : 'All Employees' }}
+            </span>
 
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ route('employees.index') }}"
+                   class="btn {{ $showDeleted ? 'btn-outline-secondary' : 'btn-secondary' }} btn-sm">
+                    Show Active Employees
+                </a>
+                <a href="{{ route('employees.index', ['deleted' => 1]) }}"
+                   class="btn {{ $showDeleted ? 'btn-secondary' : 'btn-outline-secondary' }} btn-sm">
+                    Show Deleted Employees
+                </a>
+
                 <form action="{{ route('employees.index') }}" method="GET" class="d-flex gap-2">
                     <input type="text" name="q" value="{{ $search }}" class="form-control form-control-sm"
                            placeholder="Search code, name, email, department">
+                    @if($showDeleted)
+                        <input type="hidden" name="deleted" value="1">
+                    @endif
                     <button type="submit" class="btn btn-outline-secondary btn-sm">Search</button>
                 </form>
 
-                <a href="{{ route('employees.create') }}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus me-1"></i> Add Employee
-                </a>
+                @unless($showDeleted)
+                    <a href="{{ route('employees.create') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i> Add Employee
+                    </a>
+                @endunless
             </div>
         </div>
         <div class="card-body">
@@ -58,25 +75,40 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <a href="{{ route('employees.edit', $employee) }}" class="btn btn-warning btn-sm">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
+                                    @if($showDeleted)
+                                        <form action="{{ route('employees.restore', $employee->id) }}"
+                                              method="POST"
+                                              class="d-inline"
+                                              onsubmit="return confirm('Restore this employee?');">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-trash-restore"></i> Restore
+                                            </button>
+                                        </form>
+                                    @else
+                                        <a href="{{ route('employees.edit', $employee) }}" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </a>
 
-                                    <form action="{{ route('employees.destroy', $employee) }}"
-                                          method="POST"
-                                          class="d-inline"
-                                          onsubmit="return confirm('Delete this employee?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </form>
+                                        <form action="{{ route('employees.destroy', $employee) }}"
+                                              method="POST"
+                                              class="d-inline"
+                                              onsubmit="return confirm('Delete this employee?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted">No employees found.</td>
+                                <td colspan="8" class="text-center text-muted">
+                                    {{ $showDeleted ? 'No deleted employees found.' : 'No employees found.' }}
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>

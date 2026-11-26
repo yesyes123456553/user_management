@@ -7,7 +7,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use App\Models\Department;
 
 class EmployeeController extends Controller
 {
@@ -39,8 +38,11 @@ class EmployeeController extends Controller
     public function index(Request $request): View
     {
         $search = trim((string) $request->query('q', ''));
+        $showDeleted = $request->boolean('deleted');
 
-        $employees = Employee::query()
+        $query = $showDeleted ? Employee::onlyDeleted() : Employee::query();
+
+        $employees = $query
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('employee_code', 'like', "%{$search}%")
@@ -57,6 +59,7 @@ class EmployeeController extends Controller
         return view('Employees.index', [
             'employees' => $employees,
             'search' => $search,
+            'showDeleted' => $showDeleted,
         ]);
     }
 
@@ -110,5 +113,16 @@ class EmployeeController extends Controller
         return redirect()
             ->route('employees.index')
             ->with('success', 'Employee deleted successfully.');
+    }
+
+    public function restore(int $id): RedirectResponse
+    {
+        $employee = Employee::onlyDeleted()->findOrFail($id);
+
+        $employee->restoreDeleted();
+
+        return redirect()
+            ->route('employees.index')
+            ->with('success', 'Employee restored successfully.');
     }
 }

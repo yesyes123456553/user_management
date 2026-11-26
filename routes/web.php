@@ -3,10 +3,10 @@
 use App\Http\Controllers\Authentication\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\StudentController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\StudentController;
 
 Route::redirect('/', '/dashboard');
 
@@ -40,9 +40,21 @@ Route::middleware('auth')->group(function () {
         ->except('show')
         ->middleware(EnsureUserHasRole::class.':super_admin,admin,super_user');
 
-        // Student Management: Super Admin, Admin and Super User.
+    Route::patch('employees/{id}/restore', [EmployeeController::class, 'restore'])
+        ->name('employees.restore')
+        ->middleware(EnsureUserHasRole::class.':super_admin,admin');
+
+    // Student Management: Super Admin, Admin and Super User.
     Route::resource('students', StudentController::class)
         ->except('show')
         ->middleware(EnsureUserHasRole::class.':super_admin,admin,super_user');
+
+    Route::patch('students/{id}/restore', [StudentController::class, 'restore'])
+        ->name('students.restore')
+        ->middleware(EnsureUserHasRole::class.':super_admin,admin');
+
+    Route::patch('users/{id}/restore', [UserController::class, 'restore'])
+        ->name('users.restore')
+        ->middleware(EnsureUserHasRole::class.':super_admin,admin');
 
 });

@@ -39,8 +39,11 @@ class StudentController extends Controller
     public function index(Request $request): View
     {
         $search = trim((string) $request->query('q', ''));
+        $showDeleted = $request->boolean('deleted');
 
-        $students = Student::query()
+        $query = $showDeleted ? Student::onlyDeleted() : Student::query();
+
+        $students = $query
             ->with('department')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -61,6 +64,7 @@ class StudentController extends Controller
         return view('Students.index', [
             'students' => $students,
             'search' => $search,
+            'showDeleted' => $showDeleted,
         ]);
     }
 
@@ -117,5 +121,16 @@ class StudentController extends Controller
         return redirect()
             ->route('students.index')
             ->with('success', 'Student deleted successfully.');
+    }
+
+    public function restore(int $id): RedirectResponse
+    {
+        $student = Student::onlyDeleted()->findOrFail($id);
+
+        $student->restoreDeleted();
+
+        return redirect()
+            ->route('students.index')
+            ->with('success', 'Student restored successfully.');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
@@ -113,5 +114,78 @@ class EmployeeManagementTest extends TestCase
         $this->actingAs($this->makeUserWithRole('admin'))
             ->get(route('employees.index'))
             ->assertDontSee($employee->employee_code);
+    }
+
+    public function test_admin_can_search_deleted_employees_and_restore_their_data(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $department = Department::factory()->create();
+        $employee = Employee::factory()->create([
+            'employee_code' => 'EMP-RESTORE',
+            'dept_id' => $department->id,
+            'department' => $department->college_name,
+        ]);
+        Employee::factory()->create(['employee_code' => 'EMP-OTHER']);
+
+        $this->actingAs($admin)
+            ->delete(route('employees.destroy', $employee))
+            ->assertRedirect(route('employees.index'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'is_deleted' => 1,
+            'dept_id' => $department->id,
+            'department' => $department->college_name,
+        ]);
+
+        $this->get(route('employees.index', ['deleted' => 1, 'q' => 'EMP-RESTORE']))
+            ->assertOk()
+            ->assertSee('EMP-RESTORE')
+            ->assertDontSee('EMP-OTHER')
+            ->assertSee('Restore');
+
+        $this->patch(route('employees.restore', $employee->id))
+            ->assertRedirect(route('employees.index'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'is_deleted' => 0,
+            'dept_id' => $department->id,
+            'department' => $department->college_name,
+            'employee_code' => 'EMP-RESTORE',
+        ]);
+
+        $this->get(route('employees.index'))
+            ->assertOk()
+            ->assertSee('EMP-RESTORE');
+    }
+
+    public function test_super_user_cannot_restore_an_employee(): void
+    {
+        $employee = Employee::factory()->create();
+        $employee->delete();
+
+        $this->actingAs($this->makeUserWithRole('super_user'))
+            ->patch(route('employees.restore', $employee->id))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'is_deleted' => 1,
+        ]);
+    }
+
+    public function test_active_employee_cannot_be_restored(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($this->makeUserWithRole('admin'))
+            ->patch(route('employees.restore', $employee->id))
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'is_deleted' => 0,
+        ]);
     }
 }
